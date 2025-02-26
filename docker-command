@@ -1,0 +1,125 @@
+ 22  docker
+   23  docker info
+##lets try to create our first container
+ 25  docker container run --publish 81:80 --detach nginx
+ #this will show the contianer
+   26  docker ps
+   ###docker ps -a will show running and stopped container
+   27  docker ps -a
+   ###if you want to see the test page of the container 
+   copy the public ip in the browser :81
+   
+   28  usermod -aG docker hcladmin
+   #############docker images will create an local repo and Downloaded the images 
+root@ip-172-31-26-3:~# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED       SIZE
+nginx        latest    f876bfc1cc63   5 weeks ago   192MB
+##3next time when we try to run a new container with the same image which is locally avaialbe will not download the image
+root@ip-172-31-26-3:~# docker container run --publish 82:80 --detach nginx
+1e21ba6547f5d4b674e4ced20f1e0c8338c67f95ab118c62322659d69b891250
+#lets install apache server this will download a new image as previously we have not used it 
+root@ip-172-31-26-3:~# docker container run --publish 83:80 --detach httpd
+Unable to find image 'httpd:latest' locally
+latest: Pulling from library/httpd
+fd674058ff8f: Already exists
+8c3081b233c7: Pull complete
+4f4fb700ef54: Pull complete
+172b239db5c2: Pull complete
+bbff13f6be42: Pull complete
+d7382fd3e491: Pull complete
+Digest: sha256:72f6e24600718dddef131de7cb5b31496b05c5af41e9db8707df371859a350bb
+Status: Downloaded newer image for httpd:latest
+8040e2a39bc0f24b071057e5fdf504bf975e887334f5660692c8d27f0a4cc493
+root@ip-172-31-26-3:~# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED        SIZE
+nginx        latest    f876bfc1cc63   5 weeks ago    192MB
+httpd        latest    4ce47c750a58   5 months ago   147MB
+root@ip-172-31-26-3:~#
+####lets check how many contianers we aRE running one apache server threee nginx 
+root@ip-172-31-26-3:~# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                 NAMES
+8040e2a39bc0   httpd     "httpd-foreground"       2 minutes ago    Up 2 minutes    0.0.0.0:83->80/tcp, [::]:83->80/tcp   wizardly_agnesi
+1e21ba6547f5   nginx     "/docker-entrypoint.…"   3 minutes ago    Up 3 minutes    0.0.0.0:82->80/tcp, [::]:82->80/tcp   eager_cohen
+b9975716eb50   nginx     "/docker-entrypoint.…"   20 minutes ago   Up 19 minutes   0.0.0.0:81->80/tcp, [::]:81->80/tcp   magical_ride
+
+####lets understand --detach 
+root@ip-172-31-26-3:~# docker run --publish 84:80 --name webhost nginx
+/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+#####docker ps -a 
+root@ip-172-31-26-3:~# docker ps -a
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS                     PORTS                                 NAMES
+04d24f32f037   nginx     "/docker-entrypoint.…"   2 minutes ago    Exited (0) 2 minutes ago                                         webhost
+##container vs process
+root@ip-172-31-26-3:~# docker run --name mongo -d mongo
+#############################this will shee the more command 
+root@ip-172-31-26-3:~# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                 NAMES
+a4d4c8c97ced   mongo     "docker-entrypoint.s…"   6 seconds ago    Up 5 seconds    27017/tcp                             mongo
+#lets check the mongo db process id 
+root@ip-172-31-26-3:~# docker top mongo
+UID                 PID                 PPID                C                   STIME               TTY                 TIME                CMD
+999                 13634               13610               3                   07:30               ?                   00:00:01            mongod --bind_ip_all
+#####lets do ps aux
+ps aux 
+########
+999        13634  2.0 17.4 3701660 171136 ?      Ssl  07:30   0:01 mongod --bind_ip_all
+###kill tjhe mongo id 
+root@ip-172-31-26-3:~# kill -9 13634
+root@ip-172-31-26-3:~# docker ps
+##########
+docker ps -a 
+##################
+#how to restart a container
+root@ip-172-31-26-3:~# docker start mongo
+mongo
+root@ip-172-31-26-3:~# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                 NAMES
+a4d4c8c97ced   mongo     "docker-entrypoint.s…"   9 minutes ago    Up 5 seconds    27017/tcp                             mongo
+##stop the contianer and rm will remove permanentyl
+ 48  docker start mongo
+   49  docker ps
+   50  docker
+   51  docker rm
+   52  docker ps
+   53  docker rm mongo
+   54  docker stop mongo
+   55  docker start mongo
+   56  docker rm mongo --force
+   57  history
+#delete teh image perminantyl
+ 58  docker images
+   59  docker rmi mongo
+   60  docker images
+   ####docker networking
+   #this will show all the network
+    73  docker network ls
+   
+   75  docker ps
+   ##if we can container 
+   76  docker run -d nginx
+   76  docker run -d nginx
+   76  docker run -d nginx
+   #all this threee container will run in the same port number
+   77  docker ps
+   ###this will show that the container are being mapped with bridge adapter
+   78  docker network ls
+   #if you inspect the bridge it will also show that all the contianer is geeting ip from docker 0 dhcp server
+   79  docker network inspect bridge
+   80  docker ps
+   81  docker run -d -p 82:80 nginx
+      81  docker run -d -p 82:80 nginx
+      ####lets look into the container to container communication
+       88  docker ps
+   89  docker network create my_app_net
+   90  docker network ls
+   91  docker container run -d --name my_nginx --network my_app_net nginx:alpine
+   92  docker container run -d --name new_nginx --network my_app_net nginx:alpine
+   93  docker ps
+   94  docker network ls
+   95  docker network inspect my_app_net
+  ###to stop the ping activity press ctrl c 
+   97  docker exec -it my_nginx ping new_nginx
+   98  docker exec -it new_nginx ping my_nginx
+
+
+

@@ -1,0 +1,48 @@
+##lets create a namespace
+root@ip-172-31-22-191:~# kubectl create ns project-hamster
+namespace/project-hamster created
+root@ip-172-31-22-191:~#
+##once we create the ns we will create a service account and attach the sme to the same namespace 
+root@ip-172-31-22-191:~# kubectl create sa jane -n project-hamster
+serviceaccount/jane created
+#this will not show the service account 
+root@ip-172-31-22-191:~# kubectl get sa
+NAME      SECRETS   AGE
+default   0         3d
+#this will show the jane user
+root@ip-172-31-22-191:~# kubectl get sa -n  project-hamster
+NAME      SECRETS   AGE
+default   0         87s
+jane      0         21s
+root@ip-172-31-22-191:~#
+#################once created we will create a role 
+ 246  kubectl -n project-hamester create role -h
+
+ 248  kubectl -n project-hamster create role auditrole --verb=create --resource=deployment --resource=secret
+
+
+ 249  kubectl -n project-hamster describe role auditrole
+##########################
+kubectl -n project-hamster create rolebinding auditrolejane --role=auditrole -- serviceaccount project-hamster:jane
+
+root@ip-172-31-22-191:~# kubectl -n project-hamster describe rolebinding
+Name:         auditrolebindingjane
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  auditrole
+Subjects:
+  Kind            Name  Namespace
+  ----            ----  ---------
+  ServiceAccount  jane  project-hamster
+
+##################
+
+lets verify it 
+
+  253  kubectl -n project-hamster auth can-i create secret --as system:serviceaccount:project-hamster:jane
+  254  kubectl -n project-hamster auth can-i create deployment --as system:serviceaccount:project-hamster:jane
+  ##this two will not work as jane do not have access to pod and namespace
+  255  kubectl -n project-hamster auth can-i create pod --as system:serviceaccount:project-hamster:jane
+  256  kubectl -n project-hamster auth can-i create namespace --as system:serviceaccount:project-hamster:jane

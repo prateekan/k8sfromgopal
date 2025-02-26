@@ -1,0 +1,11 @@
+Kubeadm commands
+kubeadm init to bootstrap a Kubernetes control-plane node
+kubeadm join to bootstrap a Kubernetes worker node and join it to the cluster
+kubeadm upgrade to upgrade a Kubernetes cluster to a newer version
+kubeadm config if you initialized your cluster using kubeadm v1.7.x or lower, to configure your cluster for kubeadm upgrade.
+kubeadm token to manage tokens for kubeadm join
+kubeadm reset to revert any changes made to this host by kubeadm init or kubeadm join
+kubeadm certs to manage Kubernetes certificates
+kubeadm kubeconfig to manage kubeconfig files
+kubeadm version to print the kubeadm version
+kubeadm alpha to preview a set of features made available for gathering feedback from the community

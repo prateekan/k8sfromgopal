@@ -1,0 +1,53 @@
+##lets take the back of etcd
+ 333  apt install etcd-client
+ #the below command will not work 
+  334  ETCDCTL_API=3 etcdctl snapshot save /tmp/etcd-backup.d
+  ###we need to provide all the certificate ca server and key then only it will allow you to take the backup
+  to take teh back up you need to provide ca certificate path client certificate path and server certificate path and key also 
+
+  root@ip-172-31-22-191:/etc/kubernetes/manifests# cat /etc/kubernetes/manifests/kube-apiserver.yaml | grep etcd
+    - --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt
+    - --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt
+    - --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key
+    - --etcd-servers=https://127.0.0.1:2379
+root@ip-172-31-22-191:/etc/kubernetes/manifests# ETCDCTL_API=3 etcdctl snapshot save /tmp/etcd-backup.db --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/apiserver-etcd-client.crt --key /etc/kubernetes/pki/apiserver-etcd-client.key
+
+######once you take the backup we will createa  pod 
+root@ip-172-31-22-191:/home# kubectl run test --image=nginx
+pod/test created
+#we create the pod after taking the back up
+root@ip-172-31-22-191:/home# kubectl get pod
+
+test       1/1     Running   0          5s
+#########################################
+##next we will stop all the control plane component 
+root@ip-172-31-22-191:/etc/kubernetes/manifests# mv * ..
+root@ip-172-31-22-191:/etc/kubernetes/manifests# ls
+root@ip-172-31-22-191:/etc/kubernetes/manifests#
+###########################
+lets resotre the backup 
+####################
+root@ip-172-31-22-191:/etc/kubernetes/manifests# ETCDCTL_API=3 etcdctl snapshot restore /tmp/etcd-backup.db --data-dir /var/lib/etcd-backup --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/apiserver-etcd-client.crt --key /etc/kubernetes/pki/apiserver-etcd-client.key
+{"level":"info","ts":1736161494.0978317,"caller":"snapshot/v3_snapshot.go:306","msg":"restoring snapshot","path":"/tmp/etcd-backup.d","wal-dir":"/var/lib/etcd-backup/member/wal","data-dir":"/var/lib/etcd-backup","snap-dir":"/var/lib/etcd-backup/member/snap"}
+Error: open /tmp/etcd-backup.d: no such file or directory
+root@ip-172-31-22-191:/etc/kubernetes/manifests# ETCDCTL_API=3 etcdctl snapshot restore /tmp/etcd-backup.db --data-dir /var/lib/etcd-backup --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/apiserver-etcd-client.crt --key /etc/kubernetes/pki/apiserver-etcd-client.key
+{"level":"info","ts":1736161519.8964121,"caller":"snapshot/v3_snapshot.go:306","msg":"restoring snapshot","path":"/tmp/etcd-backup.db","wal-dir":"/var/lib/etcd-backup/member/wal","data-dir":"/var/lib/etcd-backup","snap-dir":"/var/lib/etcd-backup/member/snap"}
+{"level":"info","ts":1736161519.9252105,"caller":"mvcc/kvstore.go:388","msg":"restored last compact revision","meta-bucket-name":"meta","meta-bucket-name-key":"finishedCompactRev","restored-compact-revision":65534}
+{"level":"info","ts":1736161519.934623,"caller":"membership/cluster.go:392","msg":"added member","cluster-id":"cdf818194e3a8c32","local-member-id":"0","added-peer-id":"8e9e05c52164694d","added-peer-peer-urls":["http://localhost:2380"]}
+{"level":"info","ts":1736161519.953293,"caller":"snapshot/v3_snapshot.go:326","msg":"restored snapshot","path":"/tmp/etcd-backup.db","wal-dir":"/var/lib/etcd-backup/member/wal","data-dir":"/var/lib/etcd-backup","snap-dir":"/var/lib/etcd-backup/member/snap"}
+##we have restore the back 
+
+root@ip-172-31-22-191:/etc/kubernetes/manifests# vi /etc/kubernetes/etcd.yaml
+##change the path of the file where the backup is restored
+  - hostPath:
+      path: /var/lib/etcd-backup ##change this 
+      type: DirectoryOrCreate
+    name: etcd-data
+    #####after changing the path the pod will not be back
+    root@ip-172-31-22-191:/etc/kubernetes/manifests# mv ../*.yaml .
+root@ip-172-31-22-191:/etc/kubernetes/manifests# ls
+etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml
+root@ip-172-31-22-191:/etc/kubernetes/manifests# crictl ps
+
+
+

@@ -1,0 +1,31 @@
+##lets check the node configuration
+#this will show what are the nodes you have it
+root@ip-172-31-22-191:~# kubectl get nodes
+NAME               STATUS     ROLES           AGE    VERSION
+ip-172-31-22-191   NotReady   control-plane   116m   v1.32.0
+ip-172-31-85-191   NotReady   <none>          13s    v1.32.0
+##to gather more information about nodes 
+root@ip-172-31-22-191:~# kubectl get nodes -o wide
+NAME               STATUS     ROLES           AGE    VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION   CONTAINER-RUNTIME
+ip-172-31-22-191   NotReady   control-plane   126m   v1.32.0   172.31.22.191   <none>        Ubuntu 24.04.1 LTS   6.8.0-1018-aws   containerd://1.7.24
+ip-172-31-85-191   NotReady   <none>          10m    v1.32.0   172.31.85.191   <none>        Ubuntu 24.04.1 LTS   6.8.0-1018-aws   containerd://1.7.24
+root@ip-172-31-22-191:~#
+##we can use the describe command which will give me more information about node kindly change the node name 
+  46  kubectl describe node ip-172-31-22-191
+  ########################
+to get hel related to the command 
+  49  kubectl -h
+   50  kubeadm -h
+   #$###### this will show all the pod in the master machine
+     53  kubectl get pod -A
+     ##this will give more information about the pod 
+   54  kubectl get pod -A -o wide
+   #####check that the pod is running in master or not 
+   55  kubectl get nodes
+   ######we discusss that all the component of k8s is running as container we dont have docker installed
+ 
+   57  docker
+   ##in place of docker command line we can use the crictl ps which comes by default with k8s it use an open source container engine called as crio
+   58  crictl ps
+
+

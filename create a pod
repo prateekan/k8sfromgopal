@@ -1,0 +1,38 @@
+###letys create our first pod with dry run which will give me the yaml file 
+118  kubectl run my-first-pod --image=nginx --dry-run=client -o yaml > pod.yml
+##you can see the yaml file 
+  119  cat pod.yml
+  ##apply the yaml file 
+  120  kubectl apply -f pod.yml
+  ##this will show all the running pod
+  121  kubectl get pod
+  ##this will show the pod description
+  122  kubectl describe pod my-first-pod
+  #############
+  ##if i delet teh pod it will get deleted 
+  root@ip-172-31-22-191:~# kubectl delete pod my-first-pod
+pod "my-first-pod" deleted
+root@ip-172-31-22-191:~# kubectl get pod
+No resources found in default namespace.
+root@ip-172-31-22-191:~#
+
+##pod manifest file explnation 
+##to apply any yaml file 
+##3kubectl apply -f nameoftheyaml file
+###kubectl delete -f name of the yaml file
+##all your yaml file run from top to bottom left to right
+apiVersion: v1 #this pod has an api version 
+kind: Pod ##what we are creating we are creating a pod
+metadata: #this is the pod defination
+  creationTimestamp: null
+  labels:
+    run: my-first-pod
+  name: my-first-pod #once the pod get create it will have this name
+spec: #this is pod specification
+  containers: #we are creating a container
+  - image: nginx ##this is the image of the container
+    name: my-first-pod
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}

@@ -1,0 +1,40 @@
+#lets generate the skeleton of the deployment 
+root@ip-172-31-22-191:~# kubectl create deploy my-first-deployment --image=nginx --port=80 --dry-run=client -o yaml > dep.yml
+root@ip-172-31-22-191:~# cat dep.yml
+##################
+kubectl apply -f dep.yml
+root@ip-172-31-22-191:~# kubectl delete pod my-first-deployment-77bdf869fc-djdqb
+pod "my-first-deployment-77bdf869fc-djdqb" deleted
+root@ip-172-31-22-191:~# kubectl get pod
+
+####kubectl apply -f dep.yml
+apiVersion: apps/v1 #this si the api 
+kind: Deployment #now we are creating a deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: my-first-deployment
+  name: my-first-deployment #using name we are defining the name fo the deployment
+spec: #this is the specification of the deployment 
+  replicas: 3 #we are putting replicas as three 
+  ###kubernetes will automatcally generate a unique hash walue for rs
+  selector:
+    matchLabels:
+      app: my-first-deployment
+  strategy: {}
+  template: #inside your pod you need to have similar kind of contianer
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: my-first-deployment
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources: {}
+status: {}
+##to running confioguration
+  142  kubectl edit deploy my-first-deployment
+  143  kubectl get pod

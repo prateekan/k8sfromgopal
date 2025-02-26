@@ -1,0 +1,76 @@
+
+#lets create a deployment in k8s
+#lets generate the skeleton of the deployment 
+root@ip-172-31-22-191:~# kubectl create deploy my-first-deployment --image=nginx --port=80 --dry-run=client -o yaml > dep.yml
+root@ip-172-31-22-191:~# cat dep.yml
+vi dep.yml
+#################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: my-first-deployment
+  name: my-first-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-first-deployment
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: my-first-deployment
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources: {}
+status: {}
+###############
+kubectl apply -f dep.yml 
+##lets expose the deployment in k8s
+root@ip-172-31-22-191:~# kubectl expose deploy my-first-deployment --type=NodePort --port=80 --name=my-first-service
+service/my-first-service exposed
+root@ip-172-31-22-191:~# kubectl get svc
+NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes         ClusterIP   10.96.0.1      <none>        443/TCP        2d21h
+my-first-service   NodePort    10.109.151.3   <none>        80:32243/TCP   5s
+root@ip-172-31-22-191:~#
+###once you expose your application outside your k8s cluster copy the second machine ip address and the port number which start from 30 thousadn series
+
+###to check the service is running or not 
+root@ip-172-31-22-191:~# kubectl edit svc my-first-service
+Edit cancelled, no changes made.
+
+#lets update 
+ 187  kubectl set image deployment my-first-deployment nginx=nulldevil/phpsysinfo
+  188  kubectl get deploy
+  189  kubectl get rs
+ #now refresh the browser your will seee an phpsysinfo this will show the ip of the pod you can verify the same uysing tyhe below command 
+  192  kubectl get pod -o wide
+  #####rollback
+   195  kubectl get deploy
+  196  kubectl describe deploy my-first-deployment
+  197  kubectl get rs
+  198  kubectl rollout history deployemtn my-first-deployment
+  199  kubectl rollout history deployement my-first-deployment
+  200  kubectl rollout history deploy my-first-deployment
+  201  kubectl rollout history deploy my-first-deployment --revision=1
+  202  kubectl rollout history deploy my-first-deployment --revision=2
+  203  kubectl rollout undo deploy my-first-deployment --to-revision=1
+  204  kubectl get deploy
+  205  kubectl get rs
+##manul and autoscaling 
+ 211  kubectl scale deploy my-first-deployment --replicas=10
+ kubectl get pod 
+  214  kubectl autoscale deployment my-first-deployment --min=10 --max=15 --cpu-percent=80
+  ###hpa will show the horizontaol pod autoscaling  
+  215  kubectl get hpa
+  ##finally delete the deployment  
+  kubectl delete deploy my-first-deployment
+

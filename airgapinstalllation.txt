@@ -1,0 +1,118 @@
+##################
+transfer all this file in a redhat 8 or 9 system
+###after that install docker with container d 
+#install docker
+##youneed to ensure that you are running as root user
+first go inside the docker-rpm directory
+cd docker-rpm
+################then install all the packages
+ yum install ./containerd.io-1.7.22-3.1.el8.x86_64.rpm ./docker-ce-27.3.1-1.el8.x86_64.rpm ./docker-ce-rootless-extras-27.3.1-1.el8.x86_64.rpm ./docker-buildx-plugin-0.17.1-1.el8.x86_64.rpm ./docker-ce-cli-27.3.1-1.el8.x86_64.rpm ./docker-compose-plugin-2.29.7-1.el8.x86_64.rpm ./fuse3-3.3.0-19.el8.x86_64.rpm ./fuse3-libs-3.3.0-19.el8.i686.rpm ./fuse3-libs-3.3.0-19.el8.x86_64.rpm ./fuse-common-3.3.0-19.el8.x86_64.rpm ./fuse-overlayfs-1.13-1.module+el8.10.0+22346+28c02849.x86_64.rpm ./libcgroup-0.41-19.el8.i686.rpm ./libcgroup-0.41-19.el8.x86_64.rpm ./libslirp-4.4.0-2.module+el8.10.0+22346+28c02849.x86_64.rpm ./slirp4netns-1.2.3-1.module+el8.10.0+22346+28c02849.x86_64.rpm ./container-selinux-2.229.0-2.module+el8.10.0+22346+28c02849.noarch.rpm ./glibc-2.28-251.el8_10.5.x86_64.rpm ./glibc-2.28-251.el8_10.5.i686.rpm ./glibc-gconv-extra-2.28-251.el8_10.5.i686.rpm ./glibc-gconv-extra-2.28-251.el8_10.5.x86_64.rpm ./glibc-common-2.28-251.el8_10.5.x86_64.rpm ./glibc-langpack-en-2.28-251.el8_10.5.x86_64.rpm
+#####after installtion all the docker related packages
+systemctl start docker
+systemctl enable docker
+systemctl status docker
+docker info
+docker --version
+###then import the images required for k8s
+##import all the container images for docker
+cd images
+  34  docker load < coredns
+   35  docker load < etcd
+   36  docker load < kube-apiserver
+   37  ls
+   38  docker load < kube-proxy
+   39  docker load < kube-scheduler
+   40  docker load < pause
+   41  docker load < weave-kube
+   42  docker load < weave-npc
+docker load < nginx
+###try to run a docker container and verify the same
+docker container run -d -p 80:80 nginx 
+docker ps 
+###test the nginx container
+curl localhost
+###the last command will show docker deamon is running or not
+###after installing docker now we will install kubernetes in all the machine
+##install kernel development tools
+sudo modprobe br_netfilter
+sudo modprobe ip_vs
+sudo modprobe ip_vs_rr
+sudo modprobe ip_vs_wrr
+sudo modprobe ip_vs_sh
+sudo modprobe overlay
+############################
+create a configuration file (as the root user on each node) to ensure these modules load at system boot:
+####################
+cat > /etc/modules-load.d/kubernetes.conf << EOF
+br_netfilter
+ip_vs
+ip_vs_rr
+ip_vs_wrr
+ip_vs_sh
+overlay
+EOF
+###############################
+Configure Sysctl
+############################
+cat > /etc/sysctl.d/kubernetes.conf << EOF
+net.ipv4.ip_forward = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+###########
+sysctl --system
+###############################
+Disabling Swap
+To disable swap on each server in your Kubernetes clu
+#########################
+sudo swapoff -a
+sed -e '/swap/s/^/#/g' -i /etc/fstab
+##############################
+Configure Containerd
+########################################
+ 59  cat /etc/containerd/config.toml
+   60  sudo sh -c "containerd config default > /etc/containerd/config.toml" ; cat /etc/containerd/config.toml
+#####################
+Using your preferred text editor, open the /etc/containerd/config.toml file and set the SystemdCgroup variable to true (SystemdCgroup = true):
+###################
+sudo vim /etc/containerd/config.toml
+##################################
+SystemdCgroup = true
+#########################
+Save and exit the file. Then, run the following command to ensure the containerd.service starts up and is enabled to autostart on boot up.
+##############
+sudo systemctl enable --now containerd.service
+###########################################
+Reboot your machine.
+##########################
+sudo systemctl reboot
+###################################
+set firewall rules
+#############################
+sudo firewall-cmd --zone=public --permanent --add-port=10251/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=10256/tcp
+sudo firewall-cmd --zone=public --permanent --add-port=30000-32767/tcp
+###reboot the firewall
+sudo firewall-cmd --reload
+##lets install the kubernetes component also
+cd rpm
+#################################
+yum install ./conntrack-tools-1.4.4-11.el8.x86_64.rpm ./cri-tools-1.29.0-150500.1.1.x86_64.rpm ./kubeadm-1.29.10-150500.1.1.x86_64.rpm ./kubectl-1.29.10-150500.1.1.x86_64.rpm ./kubelet-1.29.10-150500.1.1.x86_64.rpm ./kubernetes-cni-1.3.0-150500.1.1.x86_64.rpm ./libmnl-1.0.4-6.el8.i686.rpm ./libmnl-1.0.4-6.el8.x86_64.rpm ./libnetfilter_cthelper-1.0.0-15.el8.i686.rpm ./libnetfilter_cthelper-1.0.0-15.el8.x86_64.rpm ./libnetfilter_cttimeout-1.0.0-11.el8.i686.rpm ./libnetfilter_cttimeout-1.0.0-11.el8.x86_64.rpm ./libnetfilter_queue-1.0.4-3.el8.i686.rpm ./libnetfilter_queue-1.0.4-3.el8.x86_64.rpm ./libnfnetlink-1.0.1-13.el8.i686.rpm ./libnfnetlink-1.0.1-13.el8.x86_64.rpm
+
+
+ 118  systemctl enable kubelet
+  119  systemctl start kubelet
+  120  systemctl status kubelet
+###lets initialized the kubernetes 
+kubeadm init
+################once completed add the kubernetes configuration into your master machine
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+###now if you type
+kubectl get nodes
+##it will show the node in not ready state 
+##lets apply the weavenet
+kubectl apply -f weave.yml
+####now the node is in ready state

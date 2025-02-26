@@ -1,0 +1,110 @@
+##to check all the namespaces
+220  kubectl get ns
+  221  kubectl -n kube-system get pod
+  222  kubectl get pod
+  223  kubectl get deploy
+  224  kubectl delete deploy my-first-deployment
+##lets create our first namespaces
+root@ip-172-31-22-191:~# kubectl create ns dev
+namespace/dev created
+root@ip-172-31-22-191:~# kubectl describe ns dev
+Name:         dev
+Labels:       kubernetes.io/metadata.name=dev
+Annotations:  <none>
+Status:       Active
+
+No resource quota.
+
+No LimitRange resource.
+root@ip-172-31-22-191:~#
+##as of now there is no quota allocated
+root@ip-172-31-22-191:~# ^C
+root@ip-172-31-22-191:~# vi quota.yml
+####
+apiVersion: v1 
+kind: ResourceQuota 
+metadata:
+  name: mem-cpu-demo
+  namespace: dev
+spec: 
+  hard:
+    requests.cpu: "1" #gurantee that when your pod is running 
+    requests.memory: 1Gi
+    limits.cpu: "2" #maximum
+    limits.memory: 2Gi
+    #ensure that application run  efficent and reliably
+    
+
+root@ip-172-31-22-191:~# kubectl apply -f quota.yml
+resourcequota/mem-cpu-demo created
+root@ip-172-31-22-191:~#  kubectl describe ns dev
+Name:         dev
+Labels:       kubernetes.io/metadata.name=dev
+Annotations:  <none>
+Status:       Active
+
+Resource Quotas
+  Name:            mem-cpu-demo
+  Resource         Used  Hard
+  --------         ---   ---
+  limits.cpu       0     2
+  limits.memory    0     2Gi
+  requests.cpu     0     1
+  requests.memory  0     1Gi
+
+No LimitRange resource.
+##lets create a pod and use the resource 
+vi qpod1.yml
+######################
+
+apiVersion: v1 #this pod has an api version 
+kind: Pod ##what we are creating we are creating a pod
+metadata: #this is the pod defination
+  creationTimestamp: null
+  labels:
+    run: my-first-pod
+  name: quotapod1
+  namespace: dev
+spec:
+  containers: 
+  - image: nginx 
+    name: my-first-pod
+    resources: 
+      limits: 
+        memory: "800Mi"
+        cpu: "800m"
+      requests: 
+        memory: "600Mi" #mega bytes
+        cpu: "400m"
+##############apply it and check the same 
+kubectl applky -f qpod1.yml
+########################once applied check the utlization from the dns 
+234  kubectl describe ns dev
+#lets try to create a pod with over utlization and check it is running or not 
+
+  235  vi qpod2.yml
+
+
+apiVersion: v1 #this pod has an api version 
+kind: Pod ##what we are creating we are creating a pod
+metadata: #this is the pod defination
+  creationTimestamp: null
+  labels:
+    run: my-first-pod
+  name: quotapod2
+  namespace: dev
+spec:
+  containers: 
+  - image: nginx 
+    name: my-first-pod
+    resources: 
+      limits: 
+        memory: "1Gi"
+        cpu: "800m"
+      requests: 
+        memory: "700Mi" #mega bytes
+        cpu: "400m"
+####this will not work as we are tyingh to over utlized the resource 
+######
+kubectl apply -f qpod2.yml 
+

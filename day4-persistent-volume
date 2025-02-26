@@ -1,0 +1,96 @@
+##3lets login to one of the worker node 
+#we will create an directory 
+root@ip-172-31-85-191:~# mkdir /mnt/data
+##update the index.html file in the directory 
+root@ip-172-31-85-191:~# echo "this come from my storage device in workernode" > /mnt/data/index.html
+root@ip-172-31-85-191:~# '
+#####now in the master node we will create an persistent volume 
+vi pv.yml
+###############################
+apiVersion: v1 
+kind: PersistentVolume
+metadata:
+  name: task-pv-volume
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce #read #readwritemany
+  #persistentVolumeReclaimPolicy: Recycle #once the pod get delete it will delete the storage
+  storageClassName: slow #this is the name of the storage class
+  hostPath:
+    path: /mnt/data
+######################
+ 576  kubectl apply -f pv.yml
+  577  kubectl get pv
+###next we need to create an pvc : presistent volume claim 
+ 581  vi pvc.yml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tash-pv-claim
+spec:
+  resources:
+    requests:
+      storage: 10Gi
+  volumeMode: Filesystem
+  storageClassName: slow
+  accessModes:
+    - ReadWriteOnce
+
+  582  kubectl apply -f pvc.yml
+  583  kubectl get pvc
+
+  ####now we can create a pod and can consume the storage 
+  root@ip-172-31-22-191:~# kubectl run task-pv-pod --image=nginx --port=80 --dry-run=client -o yaml > pvpod.yml
+root@ip-172-31-22-191:~# vi pvpod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: task-pv-pod
+  name: task-pv-pod
+spec:
+  containers:
+  - image: nginx
+    name: task-pv-pod
+    ports:
+    - containerPort: 80
+    volumeMounts: #add this line 
+      - mountPath: "/usr/share/nginx/html" #addthis line 
+        name: task-pv-storage #addthis line 
+  volumes: #addthis line 
+    - name: task-pv-storage #addthis line 
+      persistentVolumeClaim: #addthis line 
+        claimName: tash-pv-claim #addthis line 
+
+root@ip-172-31-22-191:~# kubectl apply -f pvpod.yml
+
+##lets expose the pod 
+root@ip-172-31-22-191:~# kubectl expose pod task-pv-pod --port=80 --type=NodePort --name=task-pv-service
+service/task-pv-service exposed
+root@ip-172-31-22-191:~#
+###once you expose teh pod 
+acces the pdo using the browser
+
+###nfs volume if you want to add 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mypv
+spec:
+  capacity:
+    storage: <Size>
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: slow
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /tmp
+    server: 172.17.0.2

@@ -1,0 +1,181 @@
+###lets create some pod and check they can talk to each other or not 
+##before create those pod we need to recreated the coredns service 
+root@ip-172-31-22-191:~#  kubectl -n kube-system rollout restart deployment coredns
+deployment.apps/coredns restarted
+###next we will create a namespace 
+kubectl create ns project
+##3deploy two pod in the same name space
+root@ip-172-31-22-191:~# kubectl -n project run frontend --image=nginx
+pod/frontend created
+root@ip-172-31-22-191:~# kubectl -n project run backend --image=nginx
+pod/backend created
+root@ip-172-31-22-191:~# kubectl -n project get pod
+NAME       READY   STATUS    RESTARTS   AGE
+backend    1/1     Running   0          13s
+frontend   1/1     Running   0          21s
+###lets create service for the pod 
+root@ip-172-31-22-191:~# kubectl -n project expose pod frontend --port 80
+service/frontend exposed
+root@ip-172-31-22-191:~# kubectl -n project expose pod backend --port 80
+service/backend exposed
+##if you look into the service they 
+root@ip-172-31-22-191:~# kubectl -n project get svc
+NAME       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+backend    ClusterIP   10.109.177.168   <none>        80/TCP    91s
+frontend   ClusterIP   10.96.114.120    <none>        80/TCP    103s
+root@ip-172-31-22-191:~#
+####next we will see they are communicating or not 
+root@ip-172-31-22-191:~# kubectl -n project exec frontend -- curl backend
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   615  100   615    0     0   376k      0 --:--:-- --:--:-- --:--:--  600k
+###if i reverse the rule 
+root@ip-172-31-22-191:~# kubectl -n project exec backend -- curl frontend
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   615  100   615    0     0   397k      0 --:--:-- --:--:-- --:--:--  600k
+<!DOCTYPE html>
+#lets create a deny policy and check the communicate is working or not 
+vi default-deny.yml
+###########################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-network-policy
+  namespace: project
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+################
+kubectl apply -f default-deny.yml
+root@ip-172-31-22-191:~# kubectl -n project describe networkpolicy deny-network-policy
+Name:         deny-network-policy
+Namespace:    project
+Created on:   2025-01-06 09:53:49 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     <none> (Allowing the specific traffic to all pods in this namespace)
+  Allowing ingress traffic:
+    <none> (Selected pods are isolated for ingress connectivity)
+  Allowing egress traffic:
+    <none> (Selected pods are isolated for egress connectivity)
+  Policy Types: Ingress, Egress
+  ##lets check the communicate is block or not 
+  root@ip-172-31-22-191:~# kubectl -n project exec frontend -- curl backend
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0^C
+root@ip-172-31-22-191:~# kubectl -n project exec backend -- curl frontend
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0^C
+root@ip-172-31-22-191:~#
+##lets allow frontend to initate connection to backend 
+root@ip-172-31-22-191:~# vi frontend-policy.yml
+#################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: front-network-policy
+  namespace: project
+spec:
+  podSelector:
+    matchLabels:
+      run: frontend #search for a pod with this particular label 
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+      - podSelector:
+          matchLabels:
+            run: backend
+#######
+root@ip-172-31-22-191:~# kubectl apply -f frontend-policy.yml
+networkpolicy.networking.k8s.io/front-network-policy created
+root@ip-172-31-22-191:~# kubectl -n project describe networkpolicy front-network-policy
+Name:         front-network-policy
+Namespace:    project
+Created on:   2025-01-06 10:10:09 +0000 UTC
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     run=frontend
+  Not affecting ingress traffic
+  Allowing egress traffic:
+    To Port: <any> (traffic allowed to all ports)
+    To:
+      PodSelector: run=backend
+  Policy Types: Egress
+###frontend can intiate connection to the back for that we have created the exception
+root@ip-172-31-22-191:~# kubectl -n project exec frontend -- curl backend
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0
+  ##############lets create the ingress routing 
+  vi backend-policy.yml
+#############################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-network-policy
+  namespace: project
+spec:
+  podSelector:
+    matchLabels:
+      run: backend
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+      - podSelector:
+          matchLabels:
+            run: frontend
+##################
+kubectl apply -f backend-policy.yml
+#####now also it will nto work 
+root@ip-172-31-22-191:~# kubectl -n project exec frontend -- curl backend
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0^C
+##########take the ipaddress of the backend and check it will work 
+root@ip-172-31-22-191:~# kubectl -n project get pod -o wide
+NAME       READY   STATUS    RESTARTS   AGE   IP                NODE               NOMINATED NODE   READINESS GATES
+backend    1/1     Running   0          48m   192.168.218.171   ip-172-31-85-191   <none>           <none>
+frontend   1/1     Running   0          49m   192.168.218.170   ip-172-31-85-191   <none>           <none>
+
+###################################
+ kubectl -n project exec frontend -- curl 192.168.218.171
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   615  100   615    0     0   623k      0 --:--:-- --:--:-- --:--:--  600k
+<!DOCTYPE html>
+#####lets create aN EXCEPTION IN default deny polucyu 
+root@ip-172-31-22-191:~# vi default-deny.yml
+###add the dns exception 
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-network-policy
+  namespace: project
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  - ports:
+    - port: 53
+      protocol: TCP
+    - port: 53
+      protocol: UDP
+
+root@ip-172-31-22-191:~# kubectl apply -f default-deny.yml
+networkpolicy.networking.k8s.io/deny-network-policy configured
+root@ip-172-31-22-191:~# kubectl -n project exec frontend -- curl backend
+
+
+

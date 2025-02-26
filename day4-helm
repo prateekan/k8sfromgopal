@@ -1,0 +1,17 @@
+###how to install helm 
+  533  wget https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz
+  534  tar zxvf helm-v3.16.4-linux-amd64.tar.gz
+  535  cd linux-amd64/
+  536  ls
+  537  mv helm  /usr/bin
+  538  history
+########once you install helm 
+go to this site 
+################
+https://artifacthub.io/ 
+###we have biotnami
+############################
+  539  helm repo add grafana https://grafana.github.io/helm-charts
+  540  helm repo update
+  541  helm install monitoring grafana/grafana
+  542  kubectl get svc -A

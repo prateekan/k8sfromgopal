@@ -1,0 +1,202 @@
+##lets deploy the ingress controller
+ 369  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.6.4/deploy/static/provider/cloud/deploy.yaml
+  370  kubectl get pod -A
+ #####lets check the ingress is running or not from a browser copy the node machine ip and ingress node port paste it in the browser 
+root@ip-172-31-22-191:~# kubectl get svc -A
+NAMESPACE       NAME                                 TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+
+ingress-nginx   ingress-nginx-controller             LoadBalancer   10.103.203.107   <pending>     80:30818/TCP,443:30278/TCP   9m16s
+##we will create the two pod 
+root@ip-172-31-22-191:~# kubectl run cart --image=nginx
+pod/cart created
+root@ip-172-31-22-191:~# kubectl run payment --image=httpd
+pod/payment created
+root@ip-172-31-22-191:~# kubectl expose pod cart --port=80 --name=cartservice
+service/cartservice exposed
+root@ip-172-31-22-191:~# kubectl expose pod payment --port=80 --name=paymentservice
+service/paymentservice exposed
+#once we expose both the service it will be internal to your k8s cluster 
+root@ip-172-31-22-191:~# kubectl get svc
+NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+cartservice        ClusterIP   10.110.74.33   <none>        80/TCP         20s
+
+paymentservice     ClusterIP   10.98.14.201   <none>        80/TCP         5s
+root@ip-172-31-22-191:~#
+######LETS CREATE THE INGRESS MANIFEST
+first check the ingress class name 
+root@ip-172-31-22-191:~# kubectl get ingressclass
+NAME    CONTROLLER             PARAMETERS   AGE
+nginx   k8s.io/ingress-nginx   <none>       50m
+root@ip-172-31-22-191:~#
+#####refrence for ingress documentation https://kubernetes.io/docs/concepts/services-networking/ingress/
+vi ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minimal-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /cart
+        pathType: Prefix
+        backend:
+          service:
+            name: cartservice
+            port:
+              number: 80
+  - http:
+      paths:
+      - path: /payment
+        pathType: Prefix
+        backend:
+          service:
+            name: paymentservice
+            port:
+              number: 80
+################
+kubectl apply -f ingress.yml 
+#################################
+if you get an webhook error which look for all the resource in https
+root@ip-172-31-22-191:~# kubectl apply -f ingress.yml
+Error from server (InternalError): error when creating "ingress.yml": Internal error occurred: failed calling webhook "validate.nginx.ingress.kubernetes.io": failed to call webhook: Post "https://ingress-nginx-controller-admission.ingress-nginx.svc:443/networking/v1/ingresses?timeout=10s": context deadline exceeded
+###you can delete teh webhook
+root@ip-172-31-22-191:~# kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
+validatingwebhookconfiguration.admissionregistration.k8s.io "ingress-nginx-admission" deleted
+
+root@ip-172-31-22-191:~# kubectl apply -f ingress.yml
+ingress.networking.k8s.io/minimal-ingress created
+root@ip-172-31-22-191:~#
+################once delete 
+root@ip-172-31-22-191:~# kubectl get pod -o wide
+NAME       READY   STATUS    RESTARTS       AGE   IP                NODE               NOMINATED NODE   READINESS GATES
+cart       1/1     Running   0              15m   192.168.218.183   ip-172-31-85-191   <none>           <none>
+dnsutils   1/1     Running   1 (114m ago)   24h   192.168.218.177   ip-172-31-85-191   <none>           <none>
+payment    1/1     Running   0              14m   192.168.218.184   ip-172-31-85-191   <none>           <none>
+root@ip-172-31-22-191:~# kubectl get ingress
+NAME              CLASS   HOSTS   ADDRESS   PORTS   AGE
+minimal-ingress   nginx   *                 80      2m17s
+root@ip-172-31-22-191:~# kubectl describe ingress
+Name:             minimal-ingress
+Labels:           <none>
+Namespace:        default
+Address:
+Ingress Class:    nginx
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *
+              /cart   cartservice:80 (192.168.218.183:80)
+  *
+              /payment   paymentservice:80 (192.168.218.184:80)
+Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+Events:
+  Type    Reason  Age    From                      Message
+  ----    ------  ----   ----                      -------
+  Normal  Sync    2m26s  nginx-ingress-controller  Scheduled for sync
+root@ip-172-31-22-191:~#
+###how to secure the ingress 
+
+##check the node port number of 443
+kubectl get svc -A 
+################################
+NAMESPACE       NAME                                 TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+
+ingress-nginx   ingress-nginx-controller             LoadBalancer   10.103.203.107   <pending>     80:30818/TCP,443:30278/TCP   100m
+
+root@ip-172-31-22-191:~# curl https://3.92.49.32:30278 -kv
+
+curl: (60) SSL certificate problem: self-signed certificate
+##this will show me the fake path 
+*  issuer: O=Acme Co; CN=Kubernetes Ingress Controller Fake Certificate
+##next we will generate an self signed certificate only in the common name put 
+secure-ingress.com 
+######
+
+root@ip-172-31-22-191:~# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+.+..+.+.....+............+...+.......+.....+............+.......+........+...+...+.......+...+......+.....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*................+.....+.+.....+..........+.....+....+.....+....+..+...+.+...............+.....+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+..........+..+.+..+...................+.........+..+............+......+.+.....+.+.....+...+............+.........+....+.....+.......+.........+...+..+...................+......+...+...........+......+.+....................+.............+............+..............+..........+...+........+.......+..+.+...+.....+.+.........+......+..................+...............+..+...+...+............+..........+.....+......+.....................+.+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+......+........+.......+.....+....+......+........+....+...+...+..+....+.....+...+.+..+.......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+....+.....+.+...+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..........+....+..+...............+.+..................+..+...+.+.........+..+.......+...........+..........+..+....+......+..+...+...............+..........+..+.+...........+.........+.......+........+.....................+.+..+..........+..+..........+.........+.........+..+.+..+.+......+...+....................+.+..+...+........................+............+...+...+...+....+......+...........+......+.......+..+.........+.+......+..............+....+............+.....+...............+...+.......+.....+...+....+...+.....+.......+............+...+.....+......+.+.........+.....+......+...+......+......+.+..............+................+.....+...............+....+.........+............+...............+.....+...+.......+..+..........+..+.+........+....+....................+.............+..................+......+.....+................+........+..........+.........+...+...+...........+...+...+..........+............+.....+.+......+.....+......+....+...........+...+......+....+.....................+........+.............+..+.+..+...+......+..........+..................+...........+.......+...+..+...+......+......+....+...............+...+........+.......+.....+................+...........+...+.....................+.........+............+.............+.....+......+.+.......................+.......+....................+.+..............+...+.......+.........+..+....+...........+....+...+..+.........+................+.....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:
+State or Province Name (full name) [Some-State]:
+Locality Name (eg, city) []:
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:secure-ingress.com 
+Email Address []:
+
+###################
+once i generat the self signed certificate 
+##############################
+we need to import this inisde my k8s cluster 
+#####################
+root@ip-172-31-22-191:~# kubectl create secret tls secure-ingress --cert=cert.pem --key=key.pem
+secret/secure-ingress created
+root@ip-172-31-22-191:~# kubectl get ing,secret
+NAME                                        CLASS   HOSTS   ADDRESS   PORTS   AGE
+ingress.networking.k8s.io/minimal-ingress   nginx   *                 80      50m
+
+NAME                    TYPE                DATA   AGE
+secret/secure-ingress   kubernetes.io/tls   2      9s
+root@ip-172-31-22-191:~#
+###once imported 
+i need to add this inside my ingress manifest file  
+###############
+vi ingress.yml
+############################
+ apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minimal-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  tls:
+  - hosts:
+      - secure-ingress.com
+    secretName: secure-ingress
+  ingressClassName: nginx
+  rules:
+  - host: secure-ingress.com
+    http:
+      paths:
+      - path: /cart
+        pathType: Prefix
+        backend:
+          service:
+            name: cartservice
+            port:
+              number: 80
+      - path: /payment
+        pathType: Prefix
+        backend:
+          service:
+            name: paymentservice
+            port:
+              number: 80
+
+  433  kubectl apply -f ingress.yml
+##lets check the ingress again
+ 436  curl -kv https://3.92.49.32:30278
+  ##now it also it will show the fake certificate
+  ##lets edit the /etc/hosts file and add the public or private ip address of the worker node 
+   440  vi /etc/hosts
+   ###change the ip to your own worker node ip address 
+3.92.49.32 secure-ingress.com
+###now if you check ssl certified verified
+root@ip-172-31-22-191:~#  curl -kv https://secure-ingress.com:30278
+* Host secure-ingress.com:30278 was resolved.
+*  SSL certificate verify result: self-signed certificate (18), continuing anyway.
+*   Certificate level 0: Public key type RSA (4096/152 Bits/secBits), signed using sha256WithRSAEncryption
+* using HTTP/2

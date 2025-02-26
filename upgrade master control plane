@@ -1,0 +1,66 @@
+##before we upgrade we need to drain the node first 
+#drain means we should stop the scheduling process in k8s
+root@ip-172-31-22-191:~# kubectl get nodes
+NAME               STATUS   ROLES           AGE     VERSION
+ip-172-31-22-191   Ready    control-plane   4d1h    v1.32.0
+ip-172-31-85-191   Ready    <none>          3d23h   v1.32.0
+################drain the master node you need to choose the host name of the master node 
+root@ip-172-31-22-191:~# kubectl drain ip-172-31-22-191 --ignore-daemonsets --delete-emptydir-data
+node/ip-172-31-22-191 cordoned
+Warning: ignoring DaemonSet-managed Pods: kube-system/calico-node-wh2bj, kube-system/kube-proxy-vtfnl
+evicting pod kube-system/calico-kube-controllers-5745477d4d-5q4r8
+pod/calico-kube-controllers-5745477d4d-5q4r8 evicted
+node/ip-172-31-22-191 drained
+#############once drain scheduling will be disabled no more new workload to be run on master node
+root@ip-172-31-22-191:~# kubectl get nodes
+NAME               STATUS                     ROLES           AGE     VERSION
+ip-172-31-22-191   Ready,SchedulingDisabled   control-plane   4d1h    v1.32.0
+ip-172-31-85-191   Ready                      <none>          3d23h   v1.32.0
+root@ip-172-31-22-191:~#
+#############################now we will update the system 
+apt-get update 
+###check the lastest version of kubeadm kubectl and kubelet
+ 455  apt-get update
+  456  apt-cache show kubeadm
+  #this will show the latest version of kubectl 
+  457  kubectl get nodes -o wide
+#################### pause the agent 
+root@ip-172-31-22-191:~# apt-mark hold kubectl kubelet
+kubectl was already set on hold.
+kubelet was already set on hold.
+root@ip-172-31-22-191:~#
+#####now we ll upgrade 
+root@ip-172-31-22-191:~# apt-get install kubeadm=1.32.0-1.1 kubelet=1.32.0-1.1 kubectl=1.32.0-1.1
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+kubeadm is already the newest version (1.32.0-1.1).
+kubelet is already the newest version (1.32.0-1.1).
+kubectl is already the newest version (1.32.0-1.1).
+0 upgraded, 0 newly installed, 0 to remove and 32 not upgraded.
+#####once upgrade the 
+restart kubelet and containerd
+##################
+root@ip-172-31-22-191:~# systemctl restart kubelet
+root@ip-172-31-22-191:~# systemctl restart containerd
+#####check the upgrade teh plan 
+root@ip-172-31-22-191:~# apt-mark hold kubectl kubelet
+root@ip-172-31-22-191:~# kubeadm upgrade plan
+[preflight] Running pre-flight checks.
+[upgrade/config] Reading configuration from the "kubeadm-config" ConfigMap in namespace "kube-system"...
+[upgrade/config] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.
+[upgrade] Running cluster health checks
+[upgrade] Fetching available versions to upgrade to
+[upgrade/versions] Cluster version: 1.32.0
+[upgrade/versions] kubeadm version: v1.32.0
+[upgrade/versions] Target version: v1.32.0
+[upgrade/versions] Latest version in the v1.32 series: v1.32.0
+
+######finally we will apply the upgrade 
+root@ip-172-31-22-191:~# kubeadm upgrade apply v1.32.0
+[upgrade] Reading configuration from the "kubeadm-config" ConfigMap in namespace "kube-system"...
+####finally once upgrade do not forget the uncroding of master machine 
+root@ip-172-31-22-191:~# kubectl uncordon ip-172-31-22-191
+node/ip-172-31-22-191 already uncordoned
+root@ip-172-31-22-191:~#
+
